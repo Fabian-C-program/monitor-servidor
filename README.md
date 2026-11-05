@@ -1,58 +1,44 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+## Preguntas de Análisis y Seguridad
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+### 1. ¿Por qué la temperatura suele aparecer como “No disponible” en Windows?
+Por un tema de **permisos de seguridad** del propio sistema operativo. 
 
-## About Laravel
+* **El bloqueo de Windows:** Para leer la temperatura, el código tiene que acceder a una zona profunda de la BIOS/UEFI (`root\wmi`). Windows bloquea este acceso a los usuarios comunes para que ningún programa rompa nada.
+* **La prueba de Administrador:** Si abres la terminal como Administrador, el sistema te da los privilegios necesarios y el comando sí te devuelve el valor real. Además, dependes de que el fabricante de tu placa base sea compatible con las lecturas genéricas de Microsoft.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### 2. ¿Por qué el script de PowerShell nunca debe incluir datos que vengan del usuario?
+Porque abrirías la puerta a un ataque gravísimo llamado **Inyección de Comandos**.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+* Si dejas que un usuario escriba algo en un formulario y metes ese texto directamente en un comando `shell_exec()`, un atacante astuto podría usar comillas o puntos y comas (`;`) para cerrar tu comando original.
+* Justo después, podría escribir código destructivo (como borrar carpetas o descargar malware), y el servidor lo ejecutaría con los mismos permisos que tiene tu aplicación de Laravel.
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### 3. ¿Qué riesgo tiene dejar `/api/metrics` sin autenticación en un servidor real?
+Básicamente, le estás regalando información a los atacantes y exponiendo el servidor a que lo tumben (**Ataques DoS**).
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+* **Información pública:** Cualquier persona en internet podría ver la versión exacta de tu sistema operativo y de PHP. Si tienes algo desactualizado, un hacker sabrá exactamente qué vulnerabilidad usar en tu contra.
+* **Saturación del servidor:** Ejecutar comandos de consola como `top` o scripts de PowerShell consume recursos reales. Si un robot empieza a hacer miles de peticiones por segundo a tu API, tu procesador se va a saturar al 100% y la página web se caerá.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+---
 
-## Agentic Development
+### 4. Con polling cada 5 segundos, ¿cuántos pedidos por minuto recibe el servidor si hay 50 personas mirando?
+El servidor recibiría exactamente **600 peticiones por minuto**.
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+La cuenta es muy sencilla:
+* Cada usuario hace 12 peticiones al minuto (60 segundos / 5 segundos de intervalo).
+* Si multiplicas esas 12 peticiones por las 50 personas conectadas al mismo tiempo, te da un total de **600 visitas por minuto** saturando la API.
 
-```bash
-composer require laravel/boost --dev
+---
 
-php artisan boost:install
-```
+### 5. Si una app solo necesita la temperatura, ¿qué datos recibe de más al llamar a `/api/metrics`?
+Recibe absolutamente todo lo demás. Estás haciendo lo que en desarrollo llamamos **Over-fetching** (traer datos de sobra).
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+A la app le llega una tonelada de información que no va a usar para nada:
+* El nombre del equipo y la versión del sistema operativo.
+* La versión de PHP.
+* Todos los datos detallados del disco duro (total, libre, porcentaje).
+* Todos los datos detallados de la memoria RAM (total, disponible, porcentaje).
+* El uso actual de la CPU y los segundos que lleva el equipo encendido.
